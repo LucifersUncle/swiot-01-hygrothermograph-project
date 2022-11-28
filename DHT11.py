@@ -2,6 +2,8 @@ import RPi.GPIO as GPIO
 import time
 import swiot_DHT as DHT
 import mqtt_client
+import paho.mqtt.client as paho
+from paho import mqtt
 
 DHTPin = 11     #define the pin of DHT11
 
