@@ -1,26 +1,26 @@
 import RPi.GPIO as GPIO
 import time
 import swiot_DHT as DHT
-import mqtt_client
+import mqtt_client as mqtt
 import paho.mqtt.client as paho
 from paho import mqtt
 
 DHTPin = 11     #define the pin of DHT11
 
-client = mqtt_client.paho.Client(client_id="", userdata=None, protocol=mqtt_client.paho.MQTTv5)
-client.on_connect = mqtt_client.on_connect
+client = mqtt.paho.Client(client_id="", userdata=None, protocol=mqtt.paho.MQTTv5)
+client.on_connect = mqtt.on_connect
 
 # enable TLS for secure connection
-client.tls_set(tls_version=mqtt_client.mqtt.client.ssl.PROTOCOL_TLS)
+client.tls_set(tls_version=mqtt.mqtt.client.ssl.PROTOCOL_TLS)
 # set username and password
 client.username_pw_set("swiot", "Mysecretpassword!")
 # connect to HiveMQ Cloud on port 8883 (default for MQTT)
 client.connect("71f8087751ae4fc6b20ce20b4820d6e9.s2.eu.hivemq.cloud", 8883)
 
 # setting callbacks, use separate functions like above for better visibility
-client.on_subscribe = mqtt_client.on_subscribe
-client.on_message = mqtt_client.on_message
-client.on_publish = mqtt_client.on_publish
+client.on_subscribe = mqtt.on_subscribe
+client.on_message = mqtt.on_message
+client.on_publish = mqtt.on_publish
 
 
 def loop():
