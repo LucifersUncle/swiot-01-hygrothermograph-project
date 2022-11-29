@@ -1,21 +1,10 @@
-#
-# Copyright 2021 HiveMQ GmbH
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
+import RPi.GPIO as GPIO
 import time
+import DHT11
 import paho.mqtt.client as paho
 from paho import mqtt
+
+DHTPin = 11     #define the pin of DHT11
 
 # setting callbacks for different events to see if it works, print the message etc.
 def on_connect(client, userdata, flags, rc, properties=None):
@@ -51,13 +40,29 @@ client.on_subscribe = on_subscribe
 client.on_message = on_message
 client.on_publish = on_publish
 
-# subscribe to all topics of encyclopedia by using the wildcard "#"
-client.subscribe("data/#", qos=1)
 
-# a single publish, this can also be done in loops, etc.
-client.publish("data/temperature", payload="hot", qos=1) # temperature data here
-client.publish("data/humidity", payload="moist", qos=1)
+def loop():
+    dht = DHT11.DHT(DHTPin)   #create a DHT class object
+    counts = 0 # Measurement counts
+    while(True):
+        counts += 1
+        print("Measurement counts: ", counts)
+        for i in range(0,15):            
+            chk = dht.readDHT11()     #read DHT11 and get a return value. Then determine whether data read is normal according to the return value.
+            if (chk is dht.DHTLIB_OK):      #read DHT11 and get a return value. Then determine whether data read is normal according to the return value.
+                print("DHT11 is OK!")
+                break
+            time.sleep(0.1)
+        print("Humidity : %.2f, \t Temperature : %.2f \n"%(dht.humidity,dht.temperature))
+        client.publish("data/temperature", payload=dht.temperature, qos=1)
+        client.publish("data/humidity", payload=dht.humidity, qos=1)
+        time.sleep(5)       
+        
+if __name__ == '__main__':
+    print ('Program is starting ... ')
+    try:
+        loop()
+    except KeyboardInterrupt:
+        GPIO.cleanup()
+        exit()  
 
-# loop_forever for simplicity, here you need to stop the loop manually
-# you can also use loop_start and loop_stop
-client.loop_forever()

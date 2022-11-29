@@ -1,68 +1,123 @@
 import RPi.GPIO as GPIO
 import time
-import swiot_DHT as DHT
-import paho.mqtt.client as paho
-from paho import mqtt
 
-DHTPin = 11     #define the pin of DHT11
-
-# setting callbacks for different events to see if it works, print the message etc.
-def on_connect(client, userdata, flags, rc, properties=None):
-    print("CONNACK received with code %s." % rc)
-
-# with this callback you can see if your publish was successful
-def on_publish(client, userdata, mid, properties=None):
-    print("mid: " + str(mid))
-
-# print which topic was subscribed to
-def on_subscribe(client, userdata, mid, granted_qos, properties=None):
-    print("Subscribed: " + str(mid) + " " + str(granted_qos))
-
-# print message, useful for checking if it was successful
-def on_message(client, userdata, msg):
-    print(msg.topic + " " + str(msg.qos) + " " + str(msg.payload))
-
-# using MQTT version 5 here, for 3.1.1: MQTTv311, 3.1: MQTTv31
-# userdata is user defined data of any type, updated by user_data_set()
-# client_id is the given name of the client
-client = paho.Client(client_id="", userdata=None, protocol=paho.MQTTv5)
-client.on_connect = on_connect
-
-# enable TLS for secure connection
-client.tls_set(tls_version=mqtt.client.ssl.PROTOCOL_TLS)
-# set username and password
-client.username_pw_set("swiot", "Mysecretpassword!")
-# connect to HiveMQ Cloud on port 8883 (default for MQTT)
-client.connect("71f8087751ae4fc6b20ce20b4820d6e9.s2.eu.hivemq.cloud", 8883)
-
-# setting callbacks, use separate functions like above for better visibility
-client.on_subscribe = on_subscribe
-client.on_message = on_message
-client.on_publish = on_publish
-
-
+class DHT(object):
+	DHTLIB_OK = 0
+	DHTLIB_ERROR_CHECKSUM = -1
+	DHTLIB_ERROR_TIMEOUT = -2
+	DHTLIB_INVALID_VALUE = -999
+	
+	DHTLIB_DHT11_WAKEUP = 0.020#0.018		#18ms
+	DHTLIB_TIMEOUT = 0.0001			#100us
+	
+	humidity = 0
+	temperature = 0
+	
+	def __init__(self,pin):
+		self.pin = pin
+		self.bits = [0,0,0,0,0]
+		GPIO.setmode(GPIO.BOARD)
+	#Read DHT sensor, store the original data in bits[]	
+	def readSensor(self,pin,wakeupDelay):
+		mask = 0x80
+		idx = 0
+		self.bits = [0,0,0,0,0]
+		# Clear sda
+		GPIO.setup(pin,GPIO.OUT)
+		GPIO.output(pin,GPIO.HIGH)
+		time.sleep(0.5)
+		# start signal
+		GPIO.output(pin,GPIO.LOW)
+		time.sleep(wakeupDelay)
+		GPIO.output(pin,GPIO.HIGH)
+		# time.sleep(0.000001)
+		GPIO.setup(pin,GPIO.IN)
+		
+		loopCnt = self.DHTLIB_TIMEOUT
+		# Waiting echo
+		t = time.time()
+		while True:
+			if (GPIO.input(pin) == GPIO.LOW):
+				break
+			if((time.time() - t) > loopCnt):
+				return self.DHTLIB_ERROR_TIMEOUT
+		# Waiting echo low level end
+		t = time.time()
+		while(GPIO.input(pin) == GPIO.LOW):
+			if((time.time() - t) > loopCnt):
+				#print ("Echo LOW")
+				return self.DHTLIB_ERROR_TIMEOUT
+		# Waiting echo high level end
+		t = time.time()
+		while(GPIO.input(pin) == GPIO.HIGH):
+			if((time.time() - t) > loopCnt):
+				#print ("Echo HIGH")
+				return self.DHTLIB_ERROR_TIMEOUT
+		for i in range(0,40,1):
+			t = time.time()
+			while(GPIO.input(pin) == GPIO.LOW):
+				if((time.time() - t) > loopCnt):
+					#print ("Data Low %d"%(i))
+					return self.DHTLIB_ERROR_TIMEOUT
+			t = time.time()
+			while(GPIO.input(pin) == GPIO.HIGH):
+				if((time.time() - t) > loopCnt):
+					#print ("Data HIGH %d"%(i))
+					return self.DHTLIB_ERROR_TIMEOUT		
+			if((time.time() - t) > 0.00005):	
+				self.bits[idx] |= mask
+			#print("t : %f"%(time.time()-t))
+			mask >>= 1
+			if(mask == 0):
+				mask = 0x80
+				idx += 1	
+		#print (self.bits)
+		GPIO.setup(pin,GPIO.OUT)
+		GPIO.output(pin,GPIO.HIGH)
+		return self.DHTLIB_OK
+	#Read DHT sensor, analyze the data of temperature and humidity
+	def readDHT11Once(self):
+		rv = self.readSensor(self.pin,self.DHTLIB_DHT11_WAKEUP)
+		if (rv is not self.DHTLIB_OK):
+			self.humidity = self.DHTLIB_INVALID_VALUE
+			self.temperature = self.DHTLIB_INVALID_VALUE
+			return rv
+		self.humidity = self.bits[0]
+		self.temperature = self.bits[2] + self.bits[3]*0.1
+		sumChk = ((self.bits[0] + self.bits[1] + self.bits[2] + self.bits[3]) & 0xFF)
+		if(self.bits[4] is not sumChk):
+			return self.DHTLIB_ERROR_CHECKSUM
+		return self.DHTLIB_OK
+	def readDHT11(self):
+		result = self.DHTLIB_INVALID_VALUE
+		for i in range(0,15):
+			result = self.readDHT11Once()
+			if result == self.DHTLIB_OK:
+				return self.DHTLIB_OK
+			time.sleep(0.1)
+		return result
+		
+		
 def loop():
-    dht = DHT.DHT(DHTPin)   #create a DHT class object
-    counts = 0 # Measurement counts
-    while(True):
-        counts += 1
-        print("Measurement counts: ", counts)
-        for i in range(0,15):            
-            chk = dht.readDHT11()     #read DHT11 and get a return value. Then determine whether data read is normal according to the return value.
-            if (chk is dht.DHTLIB_OK):      #read DHT11 and get a return value. Then determine whether data read is normal according to the return value.
-                print("DHT11, OK!")
-                break
-            time.sleep(0.1)
-        print("Humidity : %.2f, \t Temperature : %.2f \n"%(dht.humidity,dht.temperature))
-        client.publish("data/temperature", payload=dht.temperature, qos=1)
-        client.publish("data/humidity", payload=dht.humidity, qos=1)
-        time.sleep(5)       
-        
+	dht = DHT(11)
+	sumCnt = 0
+	okCnt = 0
+	while(True):
+		sumCnt += 1
+		chk = dht.readDHT11()	
+		if (chk is 0):
+			okCnt += 1		
+		okRate = 100.0*okCnt/sumCnt;
+		print("sumCnt : %d, \t okRate : %.2f%% "%(sumCnt,okRate))
+		print("chk : %d, \t Humidity : %.2f, \t Temperature : %.2f "%(chk,dht.humidity,dht.temperature))
+		time.sleep(3)		
+		
 if __name__ == '__main__':
-    print ('Program is starting ... ')
-    try:
-        loop()
-    except KeyboardInterrupt:
-        GPIO.cleanup()
-        exit()  
-
+	print ('Program is starting ... ')
+	try:
+		loop()
+	except KeyboardInterrupt:
+		pass
+		exit()		
+		
+		
