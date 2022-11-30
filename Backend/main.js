@@ -23,6 +23,7 @@ client.on('error', function (error) {
 client.on('message', function (topic, message) {
     // called each time a message is received
     console.log('📩 ' + 'Received message:', topic, message.toString());
+    console.log(message.toString())
 });
 
 // subscribe to topic 'data/*'
