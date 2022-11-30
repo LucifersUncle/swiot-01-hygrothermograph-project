@@ -53,7 +53,7 @@ def loop():
                 print("DHT11 is OK!")
                 break
             time.sleep(0.1)
-        print("💧 Humidity : %.2f, \n 🌡️ Temperature : %.2f \n"%(dht.humidity,dht.temperature))
+        print("💧 Humidity : %.2f, \n🌡️ Temperature : %.2f \n"%(dht.humidity,dht.temperature))
         client.publish("data/temperature", payload=dht.temperature, qos=1)
         client.publish("data/humidity", payload=dht.humidity, qos=1)
         time.sleep(5)       
