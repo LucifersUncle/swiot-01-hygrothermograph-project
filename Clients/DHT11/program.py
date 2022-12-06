@@ -50,13 +50,13 @@ def loop():
         for i in range(0,15):            
             chk = dht.readDHT11()     #read DHT11 and get a return value. Then determine whether data read is normal according to the return value.
             if (chk is dht.DHTLIB_OK):      #read DHT11 and get a return value. Then determine whether data read is normal according to the return value.
-                print("DHT11 is OK!")
+                print(" ✅ DHT11 is OK!")
                 break
             time.sleep(0.1)
         print("💧 Humidity : %.2f, \n🌡️ Temperature : %.2f \n"%(dht.humidity,dht.temperature))
         client.publish("data/temperature", payload=dht.temperature, qos=1)
         client.publish("data/humidity", payload=dht.humidity, qos=1)
-        time.sleep(5)       
+        time.sleep(5 * 60)       
         
 if __name__ == '__main__':
     print ('Program is starting ... ')
