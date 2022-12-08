@@ -64,5 +64,6 @@ if __name__ == '__main__':
         loop()
     except KeyboardInterrupt:
         GPIO.cleanup()
+        print('Exiting program...')
         exit()  
 
